@@ -1,0 +1,17 @@
+# Large / generated artifacts
+containers/
+exampleData/
+logs/
+*.log
+
+# Local editor / tooling
+.claude/
+__MACOSX/
+.DS_Store
+
+# Upstream clone (installed via ./EEG install)
+ieeg-recon/
+
+# Documents (optional local copies)
+*.pdf
+*.docx

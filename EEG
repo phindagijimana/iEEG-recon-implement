@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# iEEG-recon implementation CLI
+#
+# Usage:
+#   ./EEG install          Download sample data, container, and ANTsPyNet models
+#   ./EEG start [args...]  Run pipeline (modules 2+3 on sample subject by default)
+#   ./EEG logs             Show or follow the latest run log
+#   ./EEG status           Check install and last run state
+
+set -euo pipefail
+
+IEEG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="${IEEG_ROOT}/logs"
+LATEST_LOG="${LOG_DIR}/latest.log"
+PID_FILE="${LOG_DIR}/run.pid"
+
+usage() {
+    cat <<EOF
+iEEG-recon CLI
+
+Usage:
+  ./EEG install              Install sample data, Apptainer container, and models
+  ./EEG start [args...]      Start pipeline (default: sample subject sub-RID0001)
+  ./EEG logs [-f]            Show latest log (use -f to follow)
+  ./EEG status               Show installation and run status
+  ./EEG help                 Show this help
+
+Environment:
+  BIDS_DIR    Override BIDS input directory for ./EEG start
+
+Examples:
+  ./EEG install
+  ./EEG start
+  ./EEG start -s sub-RID0001 -m 2
+  BIDS_DIR=/path/to/BIDS ./EEG start -s sub-YOURID -rs ses-research3T -cs ses-clinical01
+  ./EEG logs -f
+EOF
+}
+
+cmd_install() {
+    echo "=== iEEG-recon install ==="
+
+    if [[ ! -d "${IEEG_ROOT}/ieeg-recon" ]]; then
+        echo "[1/4] Cloning upstream ieeg-recon..."
+        git clone https://github.com/penn-cnt/ieeg-recon.git "${IEEG_ROOT}/ieeg-recon"
+    else
+        echo "[1/4] Upstream ieeg-recon already present"
+    fi
+
+    echo "[2/4] Sample dataset..."
+    bash "${IEEG_ROOT}/setup_sample_data.sh"
+
+    echo "[3/4] Apptainer container (may take 30-45 min on first run)..."
+    bash "${IEEG_ROOT}/setup_container.sh"
+
+    echo "[4/4] ANTsPyNet models..."
+    bash "${IEEG_ROOT}/setup_antsxnet_models.sh"
+
+    echo ""
+    echo "Install complete. Run: ./EEG start"
+}
+
+cmd_start() {
+    mkdir -p "${LOG_DIR}"
+    local timestamp
+    timestamp="$(date +%Y%m%d-%H%M%S)"
+    local log_file="${LOG_DIR}/ieeg-recon-${timestamp}.log"
+
+    ln -sfn "ieeg-recon-${timestamp}.log" "${LATEST_LOG}"
+
+    echo "=== Starting iEEG-recon ==="
+    echo "Log: ${log_file}"
+    echo ""
+
+    (
+        cd "${IEEG_ROOT}"
+        if [[ $# -gt 0 ]]; then
+            ./run_ieeg_recon.sh "$@"
+        else
+            ./run_ieeg_recon.sh
+        fi
+    ) > >(tee "${log_file}") 2>&1 &
+    local pid=$!
+    echo "${pid}" > "${PID_FILE}"
+
+    echo "PID: ${pid}"
+    echo "Follow output: ./EEG logs -f"
+    wait "${pid}"
+    local exit_code=$?
+    rm -f "${PID_FILE}"
+
+    if [[ ${exit_code} -eq 0 ]]; then
+        echo ""
+        echo "Pipeline finished successfully."
+        echo "Report: exampleData/BIDS/sub-RID0001/derivatives/ieeg_recon/module2/*_report.html"
+    else
+        echo ""
+        echo "Pipeline failed (exit ${exit_code}). See: ./EEG logs"
+        exit "${exit_code}"
+    fi
+}
+
+cmd_logs() {
+    local follow=false
+    if [[ "${1:-}" == "-f" || "${1:-}" == "--follow" ]]; then
+        follow=true
+    fi
+
+    if [[ ! -e "${LATEST_LOG}" ]]; then
+        echo "No logs found in ${LOG_DIR}"
+        ls -lt "${LOG_DIR}"/*.log 2>/dev/null | head -5 || true
+        exit 1
+    fi
+
+    if [[ "${follow}" == true ]]; then
+        tail -f "${LOG_DIR}/$(readlink "${LATEST_LOG}")"
+    else
+        cat "${LOG_DIR}/$(readlink "${LATEST_LOG}")"
+    fi
+}
+
+cmd_status() {
+    echo "=== iEEG-recon status ==="
+    echo "Root: ${IEEG_ROOT}"
+    echo ""
+
+    if [[ -d "${IEEG_ROOT}/ieeg-recon" ]]; then
+        echo "[ok] Upstream repo: ieeg-recon/"
+    else
+        echo "[--] Upstream repo: missing (run ./EEG install)"
+    fi
+
+    if [[ -d "${IEEG_ROOT}/exampleData/BIDS/sub-RID0001" ]]; then
+        echo "[ok] Sample data: exampleData/BIDS/sub-RID0001"
+    else
+        echo "[--] Sample data: missing (run ./EEG install)"
+    fi
+
+    if [[ -f "${IEEG_ROOT}/containers/ieeg_recon_1.0.sif" ]]; then
+        echo "[ok] Container: $(ls -lh "${IEEG_ROOT}/containers/ieeg_recon_1.0.sif" | awk '{print $5}')"
+    else
+        echo "[--] Container: missing (run ./EEG install)"
+    fi
+
+    if [[ -d "${IEEG_ROOT}/containers/antsxnet_cache" ]] && \
+       [[ -n "$(ls -A "${IEEG_ROOT}/containers/antsxnet_cache"/*.h5 2>/dev/null)" ]]; then
+        echo "[ok] ANTsPyNet models: containers/antsxnet_cache/"
+    else
+        echo "[--] ANTsPyNet models: missing (run ./EEG install)"
+    fi
+
+    if [[ -f "${PID_FILE}" ]] && kill -0 "$(cat "${PID_FILE}")" 2>/dev/null; then
+        echo "[running] PID $(cat "${PID_FILE}")"
+    else
+        echo "[idle] No pipeline running"
+    fi
+
+    if [[ -e "${LATEST_LOG}" ]]; then
+        echo "Latest log: ${LOG_DIR}/$(readlink "${LATEST_LOG}")"
+    fi
+}
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    case "${cmd}" in
+        install) cmd_install "$@" ;;
+        start)   cmd_start "$@" ;;
+        logs)    cmd_logs "$@" ;;
+        status)  cmd_status "$@" ;;
+        help|-h|--help) usage ;;
+        *)
+            echo "Unknown command: ${cmd}"
+            echo ""
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
