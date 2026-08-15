@@ -15,3 +15,4 @@ ieeg-recon/
 # Documents (optional local copies)
 *.pdf
 *.docx
+!science.docx
