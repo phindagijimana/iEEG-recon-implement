@@ -53,6 +53,8 @@ BIDS_DIR=/path/to/BIDS ./EEG start -s sub-YOURID -rs ses-research3T -cs ses-clin
 ├── setup_antsxnet_models.sh
 ├── SETUP.md               # Detailed HPC setup notes
 ├── iEEG.md                # Paper summary
+├── science.md             # Scientific theory of Modules 1–3
+├── science.docx           # Word version of science.md
 ├── exampleData/           # Sample data (created by install)
 ├── containers/            # SIF image + model cache (created by install)
 └── logs/                  # Run logs (created by start)
@@ -66,6 +68,15 @@ BIDS_DIR=/path/to/BIDS ./EEG start -s sub-YOURID -rs ses-research3T -cs ses-clin
 - ~8 GB RAM, ~5 GB disk for container + models
 
 See [SETUP.md](SETUP.md) for HPC-specific notes (noexec `/tmp`, `PROOT_TMP_DIR`, etc.).
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [iEEG.md](iEEG.md) | Paper summary — methods, results, limitations |
+| [science.md](science.md) | Scientific theory — CT/MRI registration, atlases, coordinate spaces |
+| [science.docx](science.docx) | Word version of [science.md](science.md) |
+| [SETUP.md](SETUP.md) | HPC install and run instructions |
 
 ## Pipeline overview
 

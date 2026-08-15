@@ -13,6 +13,9 @@ This workspace contains the iEEG-recon pipeline configured to run via Apptainer/
 | `setup_container.sh` | Pull Apptainer container |
 | `setup_antsxnet_models.sh` | Pre-download ANTsPyNet weights for Module 3 |
 | `run_ieeg_recon.sh` | Run pipeline on sample or custom data |
+| `science.md` | Scientific theory of the pipeline (Modules 1–3) |
+| `science.docx` | Word version of `science.md` |
+| `iEEG.md` | Paper summary |
 
 ## Quick start
 
@@ -73,5 +76,6 @@ BIDS_DIR=/path/to/your/BIDS ./run_ieeg_recon.sh -s sub-YOURID ...
 ## References
 
 - Paper: Lucas et al., *Epilepsia* 2024; DOI: 10.1111/epi.17863
+- Theory: [science.md](science.md) / [science.docx](science.docx)
 - Docs: https://ieeg-recon.readthedocs.io
 - Container: `docker://lucasalf11/ieeg_recon:1.0`
